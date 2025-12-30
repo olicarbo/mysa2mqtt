@@ -158,6 +158,8 @@ take precedence over command-line defaults.
 | `-s, --mysa-session-file` | `M2M_MYSA_SESSION_FILE` | `session.json` | Path to Mysa session file                                               |
 | `-t, --temperature-unit`  | `M2M_TEMPERATURE_UNIT`  | `C`            | Temperature unit (`C` = Celsius, `F` = Fahrenheit)                      |
 
+| `--mysa-home <home>`          | `M2M_MYSA_HOME`         | -              | Filter devices by the `Home` parameter; only devices whose `Home` value matches will be started. |
+
 ## Usage Examples
 
 ### Using Environment Variables (.env file)
@@ -176,6 +178,7 @@ M2M_MQTT_USERNAME=mqtt-user
 M2M_MQTT_PASSWORD=mqtt-password
 M2M_LOG_LEVEL=info
 M2M_LOG_FORMAT=pretty
+M2M_MYSA_HOME=My%20Home
 ```
 
 Then run:
@@ -195,7 +198,8 @@ mysa2mqtt \
   --mysa-username user@example.com \
   --mysa-password your-password \
   --log-level debug \
-  --log-format json
+  --log-format json \
+  --mysa-home my-home
 ```
 
 ### Mixed Configuration

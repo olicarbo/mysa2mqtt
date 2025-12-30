@@ -104,7 +104,17 @@ async function main() {
       )
   );
 
-  for (const thermostat of thermostats) {
+  const filteredThermostats =  options.mysaHome
+    ? thermostats.filter((thermostat) => {
+        return thermostat.mysaDevice.Home ===  options.mysaHome;
+      })
+    : thermostats;
+
+  filteredThermostats.forEach(thermostat => {
+      rootLogger.debug('   ' + thermostat.mysaDevice.Home + ': ' + thermostat.mysaDevice.Name + ' (' + thermostat.mysaDevice.Id + ')'
+      );
+  });
+  for (const thermostat of filteredThermostats) {
     await thermostat.start();
   }
 }

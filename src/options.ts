@@ -150,5 +150,10 @@ export const options = new Command('mysa2mqtt')
       .default('C')
       .helpGroup('Configuration')
   )
+  .addOption(
+    new Option('--mysa-home <mysa-home>', 'filter devices by Home parameter')
+      .env('M2M_MYSA_HOME')
+      .helpGroup('Mysa')
+  )
   .parse()
   .opts();

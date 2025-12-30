@@ -91,6 +91,8 @@ async function main() {
     state_prefix: options.mqttTopicPrefix
   };
 
+  rootLogger.debug('Loading Thermostats...');
+
   const thermostats = Object.entries(devices.DevicesObj).map(
     ([, device]) =>
       new Thermostat(
@@ -104,6 +106,13 @@ async function main() {
       )
   );
 
+  thermostats.forEach(thermostat => {
+      rootLogger.debug('   ' + thermostat.mysaDevice.Home + ': ' + thermostat.mysaDevice.Name + ' (' + thermostat.mysaDevice.Id + ')'
+      );
+  });
+
+  rootLogger.debug('Filtering Thermostats...');
+
   const filteredThermostats =  options.mysaHome
     ? thermostats.filter((thermostat) => {
         return thermostat.mysaDevice.Home ===  options.mysaHome;
@@ -114,6 +123,9 @@ async function main() {
       rootLogger.debug('   ' + thermostat.mysaDevice.Home + ': ' + thermostat.mysaDevice.Name + ' (' + thermostat.mysaDevice.Id + ')'
       );
   });
+
+  rootLogger.debug('Starting Thermostats...');
+
   for (const thermostat of filteredThermostats) {
     await thermostat.start();
   }

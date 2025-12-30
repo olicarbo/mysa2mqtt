@@ -24,7 +24,7 @@ SOFTWARE.
 */
 
 import { MqttSettings } from 'mqtt2ha';
-import { MysaApiClient } from 'mysa-js-sdk';
+import { DeviceBase, MysaApiClient } from 'mysa-js-sdk';
 import { pino } from 'pino';
 import { PinoLogger } from './logger';
 import { options } from './options';
@@ -67,9 +67,23 @@ async function main() {
   rootLogger.debug('Fetching devices and firmwares...');
   const [devices, firmwares] = await Promise.all([client.getDevices(), client.getDeviceFirmwares()]);
 
+  // Optionally filter devices by Home parameter early to avoid processing all devices
+  let filteredDevices = devices;
+  if (options.mysaHome) {
+    const filtered: Record<string, DeviceBase> = {};
+    for (const [id, device] of Object.entries(devices.DevicesObj)) {
+      if (device.Home === options.mysaHome) {
+        filtered[id] = device;
+      }
+    }
+    filteredDevices = { ...devices, DevicesObj: filtered };
+    rootLogger.debug(`Filtered devices to Home=${options.mysaHome}; ${Object.keys(filtered).length} device(s) remain.`);
+  }
+
+
   rootLogger.debug('Fetching serial numbers...');
   const serialNumbers = new Map<string, string>();
-  for (const [deviceId] of Object.entries(devices.DevicesObj)) {
+  for (const [deviceId] of Object.entries(filteredDevices.DevicesObj)) {
     try {
       const serial = await client.getDeviceSerialNumber(deviceId);
       if (serial) {
@@ -93,7 +107,7 @@ async function main() {
 
   rootLogger.debug('Loading Thermostats...');
 
-  const thermostats = Object.entries(devices.DevicesObj).map(
+  const thermostats = Object.entries(filteredDevices.DevicesObj).map(
     ([, device]) =>
       new Thermostat(
         client,
@@ -106,27 +120,13 @@ async function main() {
       )
   );
 
-  thermostats.forEach(thermostat => {
-      rootLogger.debug('   ' + thermostat.mysaDevice.Home + ': ' + thermostat.mysaDevice.Name + ' (' + thermostat.mysaDevice.Id + ')'
-      );
-  });
-
-  rootLogger.debug('Filtering Thermostats...');
-
-  const filteredThermostats =  options.mysaHome
-    ? thermostats.filter((thermostat) => {
-        return thermostat.mysaDevice.Home ===  options.mysaHome;
-      })
-    : thermostats;
-
-  filteredThermostats.forEach(thermostat => {
-      rootLogger.debug('   ' + thermostat.mysaDevice.Home + ': ' + thermostat.mysaDevice.Name + ' (' + thermostat.mysaDevice.Id + ')'
-      );
-  });
-
   rootLogger.debug('Starting Thermostats...');
 
-  for (const thermostat of filteredThermostats) {
+  thermostats.forEach((thermostat) => {
+    rootLogger.debug('   ' + thermostat.mysaDevice.Home + ': ' + thermostat.mysaDevice.Name + ' (' + thermostat.mysaDevice.Id + ')');
+  });
+
+  for (const thermostat of thermostats) {
     await thermostat.start();
   }
 }

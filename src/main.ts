@@ -64,20 +64,33 @@ async function main() {
     await client.login(options.mysaUsername, options.mysaPassword);
   }
 
-  rootLogger.debug('Fetching devices and firmwares...');
-  const [devices, firmwares] = await Promise.all([client.getDevices(), client.getDeviceFirmwares()]);
+  rootLogger.debug('Fetching home, devices and firmwares...');
+  const [homes, devices, firmwares] = await Promise.all([client.getHomes(), client.getDevices(), client.getDeviceFirmwares()]);
 
-  // Optionally filter devices by Home parameter early to avoid processing all devices
+  // Optionally filter devices by Home name early to avoid processing all devices
   let filteredDevices = devices;
   if (options.mysaHome) {
-    const filtered: Record<string, DeviceBase> = {};
-    for (const [id, device] of Object.entries(devices.DevicesObj)) {
-      if (device.Home === options.mysaHome) {
-        filtered[id] = device;
+    // Find the home ID by name
+    let homeId: string | undefined;
+    for (const home of homes.Homes) {
+      if (home.Name === options.mysaHome) {
+        homeId = home.Id;
+        break;
       }
     }
-    filteredDevices = { ...devices, DevicesObj: filtered };
-    rootLogger.debug(`Filtered devices to Home=${options.mysaHome}; ${Object.keys(filtered).length} device(s) remain.`);
+
+    if (!homeId) {
+      rootLogger.warn(`Home name "${options.mysaHome}" not found. Available homes: ${homes.Homes.map((h) => h.Name).join(', ')}`);
+    } else {
+      const filtered: Record<string, DeviceBase> = {};
+      for (const [id, device] of Object.entries(devices.DevicesObj)) {
+        if (device.Home === homeId) {
+          filtered[id] = device;
+        }
+      }
+      filteredDevices = { ...devices, DevicesObj: filtered };
+      rootLogger.debug(`Filtered devices to Home="${options.mysaHome}"; ${Object.keys(filtered).length} device(s) remain.`);
+    }
   }
 
 

@@ -28,7 +28,8 @@ import {
   Logger,
   MqttSettings,
   OriginConfiguration,
-  Sensor
+  Sensor,
+  Switch
 } from 'mqtt2ha';
 import {
   DeviceBase,
@@ -71,6 +72,7 @@ export class Thermostat {
   private readonly mqttTemperature: Sensor;
   private readonly mqttHumidity: Sensor;
   private readonly mqttPower: Sensor;
+  private readonly mqttFollowSchedule: Switch
 
   private readonly mysaStatusUpdateHandler = this.handleMysaStatusUpdate.bind(this);
   private readonly mysaStateChangeHandler = this.handleMysaStateChange.bind(this);
@@ -247,6 +249,21 @@ export class Thermostat {
         force_update: true
       }
     });
+
+    this.mqttFollowSchedule = new Switch({
+      mqtt: this.mqttSettings,
+      logger: this.logger,
+      component: {
+        component: 'switch',
+        device: this.mqttDevice,
+        origin: this.mqttOrigin,
+        unique_id: `mysa_${mysaDevice.Id}_follow_schedule`,
+        name: 'Follow Schedule',
+      },
+    }, async (topic, message) => {
+      this.logger.debug(`${topic} Received follow schedule command: ${message}`);
+      this.mysaApiClient.setDeviceState(this.mysaDevice.Id, undefined, undefined, undefined, message === 'ON' ? 'followSchedule' : 'hold');
+    });
   }
 
   async start() {
@@ -284,6 +301,13 @@ export class Thermostat {
       await this.mqttPower.setState('state_topic', 'None');
       await this.mqttPower.writeConfig();
 
+      this.logger.debug(`Initial ScheduleMode: ${state.ScheduleMode?.v} for device ${this.mysaDevice.Id}`);
+      await this.mqttFollowSchedule.setState(
+        'state_topic',
+        state.Mode != null && state.ScheduleMode?.v === 1 ? 'ON' : 'OFF'
+      );
+      await this.mqttFollowSchedule.writeConfig();
+
       this.mysaApiClient.emitter.on('statusChanged', this.mysaStatusUpdateHandler);
       this.mysaApiClient.emitter.on('stateChanged', this.mysaStateChangeHandler);
 
@@ -309,6 +333,7 @@ export class Thermostat {
     await this.mqttPower.setState('state_topic', 'None');
     await this.mqttTemperature.setState('state_topic', 'None');
     await this.mqttHumidity.setState('state_topic', 'None');
+    await this.mqttFollowSchedule.setState('state_topic', 'OFF');
   }
 
   private async handleMysaStatusUpdate(status: Status) {
@@ -337,6 +362,8 @@ export class Thermostat {
       return;
     }
 
+    this.logger.debug(`Received state change for device ${state.deviceId}: ${JSON.stringify(state)}`);
+
     switch (state.mode) {
       case 'off':
         this.mqttClimate.currentMode = 'off';
@@ -354,6 +381,12 @@ export class Thermostat {
         }
         this.mqttClimate.targetTemperature = state.setPoint;
         this.mqttClimate.currentFanMode = state.fanSpeed;
+
+        if (state.followSchedule != null && state.followSchedule === 'followSchedule') {
+          this.mqttFollowSchedule.on();
+        } else {
+          this.mqttFollowSchedule.off();
+        }
         break;
 
       case 'dry':
